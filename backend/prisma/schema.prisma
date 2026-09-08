@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  team_member
+  manager
+}
+
+enum ReportStatus {
+  draft
+  submitted
+  needs_correction
+  approved
+}
+
+enum ReviewAction {
+  approve
+  request_changes
+}
+
+model User {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email           String           @unique
+  password_hash   String
+  role            Role             @default(team_member)
+  active          Boolean          @default(true)
+  created_at      DateTime         @default(now()) @db.Timestamptz
+  project_members ProjectMember[]
+  reports         Report[]
+  review_comments ReviewComment[]
+
+  @@map("users")
+}
+
+model Project {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  description     String?          @db.Text
+  active          Boolean          @default(true)
+  project_members ProjectMember[]
+  reports         Report[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  user_id    String   @db.Uuid
+  project_id String   @db.Uuid
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  project    Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, project_id])
+  @@map("project_members")
+}
+
+model Report {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String           @db.Uuid
+  project_id      String           @db.Uuid
+  week_start      DateTime         @db.Date
+  week_end        DateTime         @db.Date
+  status          ReportStatus     @default(draft)
+  current_comment String?          @db.Text
+  created_at      DateTime         @default(now()) @db.Timestamptz
+  updated_at      DateTime         @default(now()) @updatedAt @db.Timestamptz
+  user            User             @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  project         Project          @relation(fields: [project_id], references: [id], onDelete: Restrict)
+  review_comments ReviewComment[]
+
+  @@unique([user_id, week_start])
+  @@index([user_id])
+  @@index([project_id])
+  @@index([status])
+  @@index([week_start])
+  @@map("reports")
+}
+
+model ReviewComment {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  report_id         String       @db.Uuid
+  reviewer_id       String       @db.Uuid
+  mongo_version_ref String?
+  comment           String       @db.Text
+  action            ReviewAction
+  created_at        DateTime     @default(now()) @db.Timestamptz
+  report            Report       @relation(fields: [report_id], references: [id], onDelete: Cascade)
+  reviewer          User         @relation(fields: [reviewer_id], references: [id], onDelete: Restrict)
+
+  @@index([report_id])
+  @@index([reviewer_id])
+  @@map("review_comments")
+}
