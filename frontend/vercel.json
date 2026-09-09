@@ -5,11 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://weekly-report-backend.onrender.com/api/:path*"
-    },
-    {
-      "source": "/health",
-      "destination": "https://weekly-report-backend.onrender.com/health"
+      "destination": "https://weekly-report-backend-quuk.onrender.com/api/:path*"
     },
     {
       "source": "/((?!assets/|favicon\\.ico|.*\\.[a-zA-Z0-9]+$).*)",
