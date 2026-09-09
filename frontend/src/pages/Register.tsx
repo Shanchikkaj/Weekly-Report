@@ -9,7 +9,7 @@ export const Register: React.FC = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'team_member' | 'manager'>('team_member');
+  const role = 'team_member';
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -87,38 +87,7 @@ export const Register: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-primary mb-1.5">
-                Account Role
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setRole('team_member')}
-                  className={`p-3 text-left border rounded-card transition-colors ${
-                    role === 'team_member'
-                      ? 'border-accent bg-accent-subtle text-accent'
-                      : 'border-border bg-surface text-muted hover:border-muted'
-                  }`}
-                >
-                  <div className="text-sm font-medium text-primary">Team Member</div>
-                  <div className="text-xs text-muted mt-0.5">Author & submit reports</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setRole('manager')}
-                  className={`p-3 text-left border rounded-card transition-colors ${
-                    role === 'manager'
-                      ? 'border-accent bg-accent-subtle text-accent'
-                      : 'border-border bg-surface text-muted hover:border-muted'
-                  }`}
-                >
-                  <div className="text-sm font-medium text-primary">Manager</div>
-                  <div className="text-xs text-muted mt-0.5">Review & approvals</div>
-                </button>
-              </div>
-            </div>
+            <input type="hidden" value="team_member" />
 
             <button
               type="submit"

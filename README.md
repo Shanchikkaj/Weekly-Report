@@ -162,34 +162,78 @@ npm test
 
 ---
 
-## ☁️ Deployment Environment Variables (Step 15)
+## ☁️ Multi-Cloud Deployment Architecture
 
-### Backend Host (Render / Railway / VM)
-Configure the following environment variables securely on the backend host:
-```env
-AI_PROVIDER=gemini
-GEMINI_API_KEY=your_private_key
-GEMINI_MODEL=gemini-3.5-flash-lite
-APP_TIMEZONE=Asia/Colombo
-```
+The system is configured for seamless deployment using free-tier cloud platforms. These represent selected deployment services:
 
-Full backend configuration:
+| Platform | Role | Plan | Key Characteristics & Free-Tier Quotas |
+| :--- | :--- | :--- | :--- |
+| **Vercel** | Frontend SPA | Hobby (Free) | Global edge CDN, automated HTTPS, same-origin API rewrite proxy. For non-commercial use. |
+| **Render** | Backend Express API | Free Web Service | 512 MB RAM, spins down after 15 minutes of inactivity (cold start takes ~30–50s on initial wake-up). |
+| **Neon** | Relational Database | Free Tier | Serverless PostgreSQL 16 (0.5 GiB storage). Provides pooled URL (PgBouncer) and direct URL. |
+| **MongoDB Atlas** | Document Store | M0 Sandbox | 512 MB storage, shared RAM, free forever. Stores report contents and version history. |
+| **Upstash** | Cache & Rate Limiter | Serverless Free | Redis (10,000 commands/day, 256 MB storage). TLS `rediss://` encrypted connections. |
+| **Google AI Studio** | AI Assistant Provider | Free Tier | Free API quota for `gemini-3.5-flash-lite`. Rate-limited (RPM/TPM). |
+| **GitHub** | Source Control | Private / Public | Automated CI/CD triggers on push to `main`. |
+
+---
+
+### Production Configuration & Environment Variables
+
+#### Backend Web Service (Render)
+Configure the following in **Render Dashboard -> Environment**:
+
 ```env
-PORT=5000
-DATABASE_URL=postgresql://<user>:<password>@<postgres-host>:5432/<dbname>?sslmode=require
-MONGO_URL=mongodb+srv://<user>:<password>@<mongo-host>/weekly_report?retryWrites=true&w=majority
-REDIS_URL=rediss://<user>:<password>@<redis-host>:6379
-JWT_SECRET=<strong-random-secret>
-JWT_REFRESH_SECRET=<strong-random-secret>
-CLIENT_URL=https://<your-frontend-domain>.vercel.app
+NODE_ENV=production
+PORT=10000
+
+# Neon PostgreSQL (Pooled connection for queries, Direct for migrations)
+DATABASE_URL=postgresql://<user>:<password>@<neon-host>-pooler.neon.tech/<dbname>?sslmode=require
+DIRECT_URL=postgresql://<user>:<password>@<neon-host>.neon.tech/<dbname>?sslmode=require
+
+# MongoDB Atlas M0 Sandbox
+MONGO_URL=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/weekly_report?retryWrites=true&w=majority
+
+# Upstash Redis (TLS enabled)
+REDIS_URL=rediss://default:<password>@<endpoint>.upstash.io:6379
+
+# JWT Authentication Secrets (32+ character cryptographically random strings)
+JWT_SECRET=<generate_via_openssl_rand_-hex_32>
+JWT_REFRESH_SECRET=<generate_via_openssl_rand_-hex_32>
+
+# Google Gemini API
 AI_PROVIDER=gemini
-GEMINI_API_KEY=your_private_key
+GEMINI_API_KEY=<your_google_ai_studio_api_key>
 GEMINI_MODEL=gemini-3.5-flash-lite
+
+# Application Configuration
+CLIENT_URL=https://<your-frontend>.vercel.app
 APP_TIMEZONE=Asia/Colombo
+COOKIE_SAMESITE=lax
 ```
 
 > [!IMPORTANT]
-> **Do NOT configure `GEMINI_API_KEY` on Vercel frontend variables**. All AI assistant requests are routed exclusively through the authenticated Node.js backend.
+> **Database Migrations on Production**:
+> - Never execute `npx prisma db push` during application startup in production.
+> - Run migrations explicitly via:
+>   ```bash
+>   npx prisma migrate deploy
+>   ```
+> - The application start command is strictly `npm start` (`node dist/index.js`).
+> - To initialize the database on Neon for the first time, execute `npx prisma migrate deploy` followed by `npm run seed` from your development terminal or deployment hook.
+
+#### MongoDB Atlas Network Access Note
+Because Render Free uses dynamic outbound IP addresses, setting Network Access to `0.0.0.0/0` (Allow access from anywhere) is necessary for Atlas connectivity:
+- Require a strong, unique database user password.
+- Grant the database user read/write access strictly to the `weekly_report` database (do not grant cluster admin).
+- Never reuse database credentials across services.
+
+#### Frontend SPA (Vercel)
+Deploy from the `frontend/` directory with Vite preset:
+- Root Directory: `frontend`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- API Proxy Architecture: `frontend/vercel.json` rewrites `/api/:path*` to the Render backend URL. Requests to `/api/*` are same-origin to the browser, ensuring seamless httpOnly cookie delivery without third-party cookie restrictions.
 
 ---
 
@@ -203,4 +247,6 @@ APP_TIMEZONE=Asia/Colombo
 | `/api/reports/:id/review` | `POST` | Manager | Approve / Request Changes with version snapshot |
 | `/api/dashboard/summary` | `GET` | Manager | Executive KPI metrics & compliance rate |
 | `/api/dashboard/trends` | `GET` | Manager | Recharts time & workload aggregations |
+| `/api/dashboard/side-by-side` | `GET` | Manager | Cross-team section comparison across weeks |
+| `/api/dashboard/weeks` | `GET` | Manager | Distinct weeks with submitted report data |
 | `/api/assistant/query` | `POST` | Manager | Grounded AI query answering team questions via Gemini |

@@ -50,6 +50,8 @@ describe('AI Assistant & Gemini Provider Test Suite (Step 13 Correction)', () =>
   let member4Id: string;
   let managerToken: string;
   let managerId: string;
+  let manager2Token: string;
+  let manager2Id: string;
 
   let projectId: string;
   let reportId1: string;
@@ -110,19 +112,39 @@ describe('AI Assistant & Gemini Provider Test Suite (Step 13 Correction)', () =>
     });
     member4Id = resMember4.body.user.id;
 
-    // Register & Login Manager
+    // Register & Login Manager 1 (via trusted promotion)
     const resManager = await request(app).post('/api/auth/register').send({
       email: `manager_${ts}@company.com`,
       password: 'Password123!',
-      role: 'manager',
     });
     managerId = resManager.body.user.id;
+    await prisma.user.update({
+      where: { id: managerId },
+      data: { role: Role.manager },
+    });
 
     const loginManager = await request(app).post('/api/auth/login').send({
       email: `manager_${ts}@company.com`,
       password: 'Password123!',
     });
     managerToken = loginManager.body.accessToken;
+
+    // Register & Login Manager 2 (for independent rate limit counter test)
+    const resManager2 = await request(app).post('/api/auth/register').send({
+      email: `manager2_${ts}@company.com`,
+      password: 'Password123!',
+    });
+    manager2Id = resManager2.body.user.id;
+    await prisma.user.update({
+      where: { id: manager2Id },
+      data: { role: Role.manager },
+    });
+
+    const loginManager2 = await request(app).post('/api/auth/login').send({
+      email: `manager2_${ts}@company.com`,
+      password: 'Password123!',
+    });
+    manager2Token = loginManager2.body.accessToken;
 
     // Create Project
     const project = await prisma.project.create({
@@ -252,7 +274,7 @@ describe('AI Assistant & Gemini Provider Test Suite (Step 13 Correction)', () =>
     await ReportContent.deleteMany({ report_id: { $in: [reportId1, reportId2] } });
     await prisma.report.deleteMany({ where: { id: { in: [reportId1, reportId2] } } });
     await prisma.project.deleteMany({ where: { id: projectId } });
-    await prisma.user.deleteMany({ where: { id: { in: [memberId, member2Id, member3Id, member4Id, managerId] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [memberId, member2Id, member3Id, member4Id, managerId, manager2Id] } } });
 
 
     await mongoose.disconnect();
@@ -563,8 +585,12 @@ describe('AI Assistant & Gemini Provider Test Suite (Step 13 Correction)', () =>
       expect(mockProvider.callCount).toBe(0);
     });
 
-    it('18g. Rate limit: 11th request within window returns 429 Too Many Requests', async () => {
-      // 10 requests should succeed
+    it('18g. Rate limit: 11th request within window returns 429, independent counters per manager, and Redis TTL is set', async () => {
+      // Clear rate limit keys before test
+      await redis.del(`rate_limit:assistant:${managerId}`);
+      await redis.del(`rate_limit:assistant:${manager2Id}`);
+
+      // 10 requests by Manager 1 should succeed (200)
       for (let i = 1; i <= 10; i++) {
         const res = await request(app)
           .post('/api/assistant/query')
@@ -573,7 +599,7 @@ describe('AI Assistant & Gemini Provider Test Suite (Step 13 Correction)', () =>
         expect(res.status).toBe(200);
       }
 
-      // 11th request must be rate limited with 429
+      // 11th request by Manager 1 must be rate limited with 429
       const res11 = await request(app)
         .post('/api/assistant/query')
         .set('Authorization', `Bearer ${managerToken}`)
@@ -581,6 +607,22 @@ describe('AI Assistant & Gemini Provider Test Suite (Step 13 Correction)', () =>
 
       expect(res11.status).toBe(429);
       expect(res11.body.error).toContain('Rate limit exceeded');
+
+      // Verify Redis TTL on Manager 1's counter is active (> 0 and <= 3600)
+      const ttl = await redis.ttl(`rate_limit:assistant:${managerId}`);
+      expect(ttl).toBeGreaterThan(0);
+      expect(ttl).toBeLessThanOrEqual(3600);
+
+      // Verify Manager 2 has an independent counter and is NOT rate limited
+      const resMgr2 = await request(app)
+        .post('/api/assistant/query')
+        .set('Authorization', `Bearer ${manager2Token}`)
+        .send({ question: 'What did Evan work on this week?' });
+      expect(resMgr2.status).toBe(200);
+
+      // Clean up rate limit keys
+      await redis.del(`rate_limit:assistant:${managerId}`);
+      await redis.del(`rate_limit:assistant:${manager2Id}`);
     });
   });
 });

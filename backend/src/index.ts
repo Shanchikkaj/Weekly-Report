@@ -22,9 +22,25 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  ...(isProduction ? [] : ['http://localhost:3000', 'http://localhost:5173']),
+].filter(Boolean) as string[];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like server-to-server Vercel proxy rewrites, curl, health checks)
+      if (!origin) return callback(null, true);
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      const isAllowed = allowedOrigins.some((allowed) => allowed.replace(/\/$/, '') === normalizedOrigin);
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      }
+    },
     credentials: true,
   })
 );

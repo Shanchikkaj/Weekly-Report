@@ -1,6 +1,7 @@
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../index';
+import { Role } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { redis } from '../config/redis';
 import { connectPostgres, pool } from '../config/postgres';
@@ -37,13 +38,16 @@ describe('STEP 8: Projects Module & Soft Delete Workflow Test Suite', () => {
     });
     memberToken = memberLogin.body.accessToken;
 
-    // Register & Login Manager
+    // Register & Login Manager (via trusted promotion)
     const managerRes = await request(app).post('/api/auth/register').send({
       email: `manager_proj_${ts}@project.test`,
       password: 'Password123!',
-      role: 'manager',
     });
     managerId = managerRes.body.user.id;
+    await prisma.user.update({
+      where: { id: managerId },
+      data: { role: Role.manager },
+    });
     const managerLogin = await request(app).post('/api/auth/login').send({
       email: `manager_proj_${ts}@project.test`,
       password: 'Password123!',

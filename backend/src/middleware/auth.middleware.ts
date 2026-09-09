@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
+import { prisma } from '../config/prisma';
 import { AppError } from './errorHandler';
 
 export interface AuthenticatedUser {
@@ -19,9 +20,9 @@ declare global {
 }
 
 /**
- * Middleware: Validates Bearer access token and attaches req.user
+ * Middleware: Validates Bearer access token, checks active status, and attaches req.user
  */
-export const requireAuth = (
+export const requireAuth = async (
   req: Request,
   _res: Response,
   next: NextFunction
@@ -46,10 +47,20 @@ export const requireAuth = (
       role: Role;
     };
 
+    // Verify user is active in PostgreSQL
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, email: true, role: true, active: true },
+    });
+
+    if (!user || !user.active) {
+      return next(new AppError(401, 'Account has been deactivated. Please contact an administrator.'));
+    }
+
     req.user = {
-      id: decoded.userId,
-      email: decoded.email,
-      role: decoded.role,
+      id: user.id,
+      email: user.email,
+      role: user.role,
     };
 
     next();

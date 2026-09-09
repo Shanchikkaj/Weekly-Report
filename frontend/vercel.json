@@ -4,7 +4,15 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/:path*",
+      "destination": "https://weekly-report-backend.onrender.com/api/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://weekly-report-backend.onrender.com/health"
+    },
+    {
+      "source": "/((?!assets/|favicon\\.ico|.*\\.[a-zA-Z0-9]+$).*)",
       "destination": "/index.html"
     }
   ]

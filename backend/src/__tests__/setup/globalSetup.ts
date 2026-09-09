@@ -8,10 +8,13 @@ export default async function globalSetup() {
   const envTestPath = path.resolve(__dirname, '../../../.env.test');
   dotenv.config({ path: envTestPath, override: true });
 
-  const adminPostgresUrl = 'postgresql://postgres:postgres@localhost:5432/postgres';
+  const pgHost = process.env.PG_HOST || (process.env.DATABASE_URL?.includes('@postgres') ? 'postgres' : 'localhost');
+  const mongoHost = process.env.MONGO_HOST || (process.env.MONGO_URL?.includes('mongodb:') || process.env.MONGO_URL?.includes('@mongodb') ? 'mongodb' : 'localhost');
+
+  const adminPostgresUrl = `postgresql://postgres:postgres@${pgHost}:5432/postgres`;
   const testDbName = 'weekly_report_test';
-  const testPostgresUrl = `postgresql://postgres:postgres@localhost:5432/${testDbName}`;
-  const testMongoUrl = 'mongodb://localhost:27017/weekly_report_test';
+  const testPostgresUrl = `postgresql://postgres:postgres@${pgHost}:5432/${testDbName}`;
+  const testMongoUrl = `mongodb://${mongoHost}:27017/weekly_report_test`;
 
   console.log('\n[Global Test Setup] Ensuring isolated test database exists...');
 
@@ -38,6 +41,7 @@ export default async function globalSetup() {
       env: {
         ...process.env,
         DATABASE_URL: testPostgresUrl,
+        DIRECT_URL: testPostgresUrl,
       },
       stdio: 'ignore',
     });

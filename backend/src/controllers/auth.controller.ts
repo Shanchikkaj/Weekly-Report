@@ -29,9 +29,9 @@ export class AuthController {
       }
 
       // Set refresh token in httpOnly cookie
-      // In production across domains (e.g., Vercel + Render), sameSite must be 'none' with secure=true
+      // In production with same-origin Vercel rewrite proxy, sameSite defaults to 'lax' without domain attribute
       const isProduction = process.env.NODE_ENV === 'production';
-      const cookieSameSite = (process.env.COOKIE_SAMESITE as 'lax' | 'strict' | 'none') || (isProduction ? 'none' : 'lax');
+      const cookieSameSite = (process.env.COOKIE_SAMESITE as 'lax' | 'strict' | 'none') || 'lax';
       const isCookieSecure = isProduction || cookieSameSite === 'none';
 
       res.cookie(COOKIE_NAME, refreshToken, {
@@ -71,7 +71,7 @@ export class AuthController {
       await authService.logout(refreshToken);
 
       const isProduction = process.env.NODE_ENV === 'production';
-      const cookieSameSite = (process.env.COOKIE_SAMESITE as 'lax' | 'strict' | 'none') || (isProduction ? 'none' : 'lax');
+      const cookieSameSite = (process.env.COOKIE_SAMESITE as 'lax' | 'strict' | 'none') || 'lax';
       const isCookieSecure = isProduction || cookieSameSite === 'none';
 
       res.clearCookie(COOKIE_NAME, {

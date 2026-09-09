@@ -3,6 +3,7 @@ import { prisma } from '../config/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { ReportContent } from '../models/ReportContent';
 import { Role, ReportStatus } from '@prisma/client';
+import { invalidateUserSessions } from './auth.service';
 
 export class UserService {
   /**
@@ -144,7 +145,7 @@ export class UserService {
       throw new AppError(404, 'User not found.');
     }
 
-    return prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id },
       data: { active },
       select: {
@@ -154,6 +155,12 @@ export class UserService {
         active: true,
       },
     });
+
+    if (!active) {
+      await invalidateUserSessions(id);
+    }
+
+    return updatedUser;
   }
 
   /**

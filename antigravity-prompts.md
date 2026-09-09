@@ -312,7 +312,7 @@ Print login credentials for each seeded account to the console when the script f
 ```
 STEP 13: AI chat assistant, manager-facing only.
 
-Backend: POST /api/assistant/query — Manager only. Accepts a natural language question (e.g. "What did the design team work on last week?"). Service layer: pull relevant reports (respecting RBAC — only the manager's visible team data, paginated/limited reasonably, e.g. last 4 weeks), format a compact context summary (not raw dumps of every field), and call the Google Gemini API (gemini-1.5-flash via @google/generative-ai) with the question + context, asking it to answer based only on the provided data.
+Backend: POST /api/assistant/query — Manager only. Accepts a natural language question (e.g. "What did the design team work on last week?"). Service layer: pull relevant reports (respecting RBAC — only the manager's visible team data, paginated/limited reasonably, e.g. last 4 weeks), format a compact context summary (not raw dumps of every field), and call the Google Gemini API (gemini-3.5-flash-lite via @google/genai) with the question + context, asking it to answer based only on the provided data.
 
 Be explicit in code comments about what data is being sent externally — this is required documentation for my presentation.
 

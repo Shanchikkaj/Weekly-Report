@@ -1,8 +1,10 @@
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../index';
+import { Role } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { redis } from '../config/redis';
+import { getRefreshTokenKey } from '../services/auth.service';
 import { connectPostgres, pool } from '../config/postgres';
 import { connectMongo } from '../config/mongo';
 import { connectRedis } from '../config/redis';
@@ -92,15 +94,30 @@ describe('RBAC & Ownership Authorization Test Suite', () => {
     tokenB = loginB.body.accessToken;
     expect(tokenB).toBeDefined();
 
-    // Register Manager
+    // Verify public registration cannot create Manager (expects 403)
+    const rejectM = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: `tamper_mgr_${ts}@rbac.test`,
+        password: 'Password123!',
+        role: 'manager',
+      });
+    expect(rejectM.status).toBe(403);
+    expect(rejectM.body.error).toMatch(/Public registration cannot create Manager/i);
+
+    // Register User then promote to Manager via trusted database update
     const resM = await request(app)
       .post('/api/auth/register')
       .send({
         email: `manager_${ts}@rbac.test`,
         password: 'Password123!',
-        role: 'manager',
       });
     expect(resM.status).toBe(201);
+
+    await prisma.user.update({
+      where: { email: `manager_${ts}@rbac.test` },
+      data: { role: Role.manager },
+    });
 
     // Login Manager
     const loginM = await request(app)
@@ -189,5 +206,58 @@ describe('RBAC & Ownership Authorization Test Suite', () => {
     const res = await request(app).get(`/api/reports/${reportAId}`);
     expect(res.status).toBe(401);
     expect(res.body.error).toMatch(/Authentication required/i);
+  });
+
+  // 6. requireAuth dynamic active check: Deactivated user's access token stops working immediately
+  it('6. should reject previously valid access token immediately after account deactivation (requireAuth active check)', async () => {
+    // 1. Verify access token works initially while user is active
+    const activeRes = await request(app)
+      .get('/api/reports')
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(activeRes.status).toBe(200);
+
+    // 2. Deactivate user directly in PostgreSQL
+    await prisma.user.update({
+      where: { id: userAId },
+      data: { active: false },
+    });
+
+    // 3. Attempt to reuse the exact same access token -> must return 401
+    const deactivatedRes = await request(app)
+      .get('/api/reports')
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(deactivatedRes.status).toBe(401);
+    expect(deactivatedRes.body.error).toMatch(/Account has been deactivated/i);
+
+    // 4. Reactivate user for remaining tests & cleanup
+    await prisma.user.update({
+      where: { id: userAId },
+      data: { active: true },
+    });
+  });
+
+  // 7. Deactivation invalidates Redis refresh session key
+  it('7. should invalidate Redis refresh session when user is deactivated via updateStatus', async () => {
+    // Check that Redis refresh token exists for user A
+    const redisKey = getRefreshTokenKey(userAId);
+    const existingToken = await redis.get(redisKey);
+    expect(existingToken).toBeTruthy();
+
+    // Manager deactivates User A via status endpoint
+    const deactRes = await request(app)
+      .put(`/api/users/${userAId}/status`)
+      .set('Authorization', `Bearer ${tokenManager}`)
+      .send({ active: false });
+    expect(deactRes.status).toBe(200);
+
+    // Verify the Redis session key has been completely deleted
+    const sessionAfterDeactivation = await redis.get(redisKey);
+    expect(sessionAfterDeactivation).toBeNull();
+
+    // Reactivate user A
+    await request(app)
+      .put(`/api/users/${userAId}/status`)
+      .set('Authorization', `Bearer ${tokenManager}`)
+      .send({ active: true });
   });
 });

@@ -11,6 +11,12 @@ const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
+export const getRefreshTokenKey = (userId: string): string => `refresh_token:${userId}`;
+
+export const invalidateUserSessions = async (userId: string): Promise<void> => {
+  await redis.del(getRefreshTokenKey(userId));
+};
+
 const getJwtSecret = (): string => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
@@ -69,10 +75,12 @@ export class AuthService {
     // Validate role
     let assignedRole: Role = Role.team_member;
     if (role) {
-      if (role === 'manager' || role === 'team_member') {
-        assignedRole = role as Role;
+      if (role === 'manager' || role === 'admin') {
+        throw new AppError(403, 'Public registration cannot create Manager or Admin accounts.');
+      } else if (role === 'team_member') {
+        assignedRole = Role.team_member;
       } else {
-        throw new AppError(400, 'Invalid role. Allowed roles are: team_member, manager.');
+        throw new AppError(400, 'Invalid role. Allowed role is: team_member.');
       }
     }
 
@@ -177,7 +185,7 @@ export class AuthService {
     );
 
     // Store refresh token in Redis keyed by user id
-    const redisKey = `refresh_token:${user.id}`;
+    const redisKey = getRefreshTokenKey(user.id);
     await redis.set(redisKey, refreshToken, 'EX', REFRESH_TOKEN_TTL_SECONDS);
 
     return {
@@ -207,7 +215,7 @@ export class AuthService {
     }
 
     // Verify token matches Redis session
-    const redisKey = `refresh_token:${payload.userId}`;
+    const redisKey = getRefreshTokenKey(payload.userId);
     const storedToken = await redis.get(redisKey);
 
     if (!storedToken || storedToken !== refreshToken) {
@@ -226,7 +234,7 @@ export class AuthService {
     });
 
     if (!user || !user.active) {
-      await redis.del(redisKey);
+      await invalidateUserSessions(payload.userId);
       throw new AppError(401, 'User account is inactive or not found.');
     }
 
@@ -255,7 +263,7 @@ export class AuthService {
     try {
       const payload = jwt.verify(refreshToken, getJwtRefreshSecret()) as { userId: string };
       if (payload?.userId) {
-        await redis.del(`refresh_token:${payload.userId}`);
+        await invalidateUserSessions(payload.userId);
       }
     } catch {
       // Even if token verification fails on logout, we fail gracefully

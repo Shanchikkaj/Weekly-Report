@@ -1,6 +1,7 @@
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../index';
+import { Role } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { redis } from '../config/redis';
 import { connectPostgres, pool } from '../config/postgres';
@@ -61,13 +62,16 @@ describe('STEP 7: Manager Review & Version History Workflow Test Suite', () => {
     });
     tokenB = loginB.body.accessToken;
 
-    // Register & Login Manager
+    // Register & Login Manager (via trusted promotion)
     const resM = await request(app).post('/api/auth/register').send({
       email: `lead_manager_${ts}@review.test`,
       password: 'Password123!',
-      role: 'manager',
     });
     managerId = resM.body.user.id;
+    await prisma.user.update({
+      where: { id: managerId },
+      data: { role: Role.manager },
+    });
     const loginM = await request(app).post('/api/auth/login').send({
       email: `lead_manager_${ts}@review.test`,
       password: 'Password123!',

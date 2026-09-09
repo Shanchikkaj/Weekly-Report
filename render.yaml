@@ -4,14 +4,16 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma db push && npm start
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
         sync: false
       - key: MONGO_URL
         sync: false
@@ -32,4 +34,4 @@ services:
       - key: APP_TIMEZONE
         value: Asia/Colombo
       - key: COOKIE_SAMESITE
-        value: none
+        value: lax

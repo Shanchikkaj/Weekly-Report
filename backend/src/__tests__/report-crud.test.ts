@@ -6,7 +6,7 @@ import { redis } from '../config/redis';
 import { connectPostgres, pool } from '../config/postgres';
 import { connectMongo } from '../config/mongo';
 import { connectRedis } from '../config/redis';
-import { ReportStatus } from '@prisma/client';
+import { Role, ReportStatus } from '@prisma/client';
 import { ReportContent } from '../models/ReportContent';
 
 
@@ -63,11 +63,14 @@ describe('Report CRUD & State Machine Workflow Test Suite', () => {
     });
     tokenB = loginB.body.accessToken;
 
-    // Register & Login Manager
+    // Register & Login Manager (via trusted promotion)
     await request(app).post('/api/auth/register').send({
       email: `manager_${ts}@workflow.test`,
       password: 'Password123!',
-      role: 'manager',
+    });
+    await prisma.user.update({
+      where: { email: `manager_${ts}@workflow.test` },
+      data: { role: Role.manager },
     });
     const loginM = await request(app).post('/api/auth/login').send({
       email: `manager_${ts}@workflow.test`,

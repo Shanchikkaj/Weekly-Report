@@ -5,16 +5,24 @@ dotenv.config();
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-export const redis = new Redis(redisUrl, {
+const redisOptions: any = {
   lazyConnect: true,
   maxRetriesPerRequest: 1,
-  retryStrategy(times) {
+  retryStrategy(times: number) {
     if (times > 5) {
       return null; // Stop retrying after 5 attempts
     }
     return Math.min(times * 1000, 3000);
   },
-});
+};
+
+if (redisUrl.startsWith('rediss://')) {
+  redisOptions.tls = {
+    rejectUnauthorized: false,
+  };
+}
+
+export const redis = new Redis(redisUrl, redisOptions);
 
 redis.on('error', (err: any) => {
   console.error(`[Redis] Connection error: ${err?.message || err}`);
