@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/__tests__/**",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "tests/**",
+    "test/**",
+    "coverage/**",
+    "src/scripts/seed.ts",
+    "src/scripts/seed-review-demo.ts",
+    "src/scripts/test-auth-flow.ts",
+    "src/scripts/test-mongo-schemas.ts",
+    "src/scripts/verify-all-security-evidence.ts",
+    "src/scripts/verify-assistant.ts",
+    "src/scripts/verify-security-review.ts"
+  ]
+}
