@@ -17,9 +17,7 @@ const redisOptions: any = {
 };
 
 if (redisUrl.startsWith('rediss://')) {
-  redisOptions.tls = {
-    rejectUnauthorized: false,
-  };
+  redisOptions.tls = {};
 }
 
 export const redis = new Redis(redisUrl, redisOptions);

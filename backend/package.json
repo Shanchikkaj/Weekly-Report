@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "test": "jest --runInBand",
     "seed": "ts-node-dev --transpile-only src/scripts/seed.ts",
+    "seed:prod": "ts-node src/scripts/seed-production.ts",
     "migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {

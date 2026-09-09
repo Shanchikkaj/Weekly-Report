@@ -16,6 +16,7 @@ import userRoutes from './routes/user.routes';
 import assistantRoutes from './routes/assistant.routes';
 import { requireAuth } from './middleware/auth.middleware';
 import { errorHandler } from './middleware/errorHandler';
+import { bootstrapProductionData } from './scripts/seed-production';
 
 dotenv.config();
 
@@ -76,8 +77,16 @@ export const startServer = async () => {
   await connectMongo();
   await connectRedis();
 
-  const server = app.listen(port, () => {
-    console.log(`[Server] Backend listening on port ${port}`);
+  if (process.env.SEED_DATABASE === 'true') {
+    try {
+      await bootstrapProductionData();
+    } catch (err: any) {
+      console.error('[Server] Production bootstrap encountered an error:', err?.message || err);
+    }
+  }
+
+  const server = app.listen(port, '0.0.0.0', () => {
+    console.log(`[Server] Backend listening on 0.0.0.0:${port}`);
   });
 
   return { app, server };

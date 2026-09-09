@@ -3,9 +3,10 @@ services:
     name: weekly-report-backend
     runtime: node
     plan: free
+    branch: main
     rootDir: backend
     buildCommand: npm ci && npx prisma generate && npm run build
-    startCommand: npm start
+    startCommand: npx prisma migrate deploy && npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -20,18 +21,18 @@ services:
       - key: REDIS_URL
         sync: false
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_REFRESH_SECRET
-        generateValue: true
+        sync: false
       - key: AI_PROVIDER
         value: gemini
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
         value: gemini-3.5-flash-lite
-      - key: CLIENT_URL
-        sync: false
       - key: APP_TIMEZONE
         value: Asia/Colombo
+      - key: CLIENT_URL
+        sync: false
       - key: COOKIE_SAMESITE
         value: lax
