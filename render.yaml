@@ -12,6 +12,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22.14.0
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL

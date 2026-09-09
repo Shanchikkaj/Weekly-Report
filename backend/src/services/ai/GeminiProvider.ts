@@ -1,11 +1,12 @@
-import { GoogleGenAI } from '@google/genai';
 import { AIProvider, GenerateTextOptions } from './AIProvider';
+
+type GoogleGenAIInstance = InstanceType<(typeof import('@google/genai', { with: { 'resolution-mode': 'import' } }))['GoogleGenAI']>;
 
 export class GeminiProvider implements AIProvider {
   readonly name = 'gemini';
   readonly model: string;
   private apiKey: string;
-  private client: GoogleGenAI | null = null;
+  private client: GoogleGenAIInstance | null = null;
 
   constructor(apiKey?: string, model?: string) {
     this.apiKey = (apiKey !== undefined ? apiKey : (process.env.GEMINI_API_KEY || '')).trim();
@@ -15,10 +16,15 @@ export class GeminiProvider implements AIProvider {
       throw new Error('GEMINI_MODEL environment variable is not configured. Please set GEMINI_MODEL (e.g. gemini-3.5-flash-lite).');
     }
     this.model = envModel;
+  }
 
-    if (this.apiKey) {
-      this.client = new GoogleGenAI({ apiKey: this.apiKey });
+  private async getClient(apiKey: string): Promise<GoogleGenAIInstance> {
+    if (!this.client || this.apiKey !== apiKey) {
+      this.apiKey = apiKey;
+      const { GoogleGenAI: GoogleGenAIClass } = await import('@google/genai');
+      this.client = new GoogleGenAIClass({ apiKey: this.apiKey });
     }
+    return this.client;
   }
 
   async generateText(prompt: string, options?: GenerateTextOptions): Promise<string> {
@@ -32,14 +38,11 @@ export class GeminiProvider implements AIProvider {
       throw new Error('GEMINI_MODEL environment variable is not configured.');
     }
 
-    if (!this.client || this.apiKey !== activeKey) {
-      this.apiKey = activeKey;
-      this.client = new GoogleGenAI({ apiKey: this.apiKey });
-    }
+    const client = await this.getClient(activeKey);
 
     try {
       const maxTokens = options?.maxTokens ?? 2048;
-      let response = await this.client.models.generateContent({
+      let response = await client.models.generateContent({
         model: activeModel,
         contents: prompt,
         config: {
@@ -57,7 +60,7 @@ export class GeminiProvider implements AIProvider {
         console.warn(`[GeminiProvider] Output truncated (MAX_TOKENS). Retrying once with concise summary directive...`);
         const retryPrompt = `${prompt}\n\n[CRITICAL FORMATTING DIRECTIVE: The previous attempt exceeded length limits and was truncated. Provide a more concise, compact summary ensuring all team members are covered without repeating long descriptions.]`;
         
-        response = await this.client.models.generateContent({
+        response = await client.models.generateContent({
           model: activeModel,
           contents: retryPrompt,
           config: {
